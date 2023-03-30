@@ -220,5 +220,55 @@ spec:
 Create simple cluster
 
 ```bash
-kubectl create -f civo/civo-simple-cluster.yaml
+kubectl create -f civo/civo-cluster.yaml
+```
+
+## Digital Ocean
+
+Install the provider
+
+```bash
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: digitalocean-civo
+spec:
+  package: xpkg.upbound.io/upbound/provider-digitalocean:v0.2.0
+```
+
+Create Credentials
+
+Create a [personal access token](https://cloud.digitalocean.com/account/api/tokens) in your Digital Ocean account.
+
+Create the secret
+
+```bash
+kubectl create secret \
+generic digitalocean-secret \
+-n crossplane-system \
+--from-literal=token=<access-token>
+
+kubectl describe secret digitalovean-secret -n crossplane-system
+```
+
+Create a provider config
+
+```bash
+apiVersion: do.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: digitalocean-pc
+spec:
+  credentials:
+    secretRef:
+      key: token
+      name: digitalocean-secret
+      namespace: crossplane-system
+    source: Secret
+```
+
+Create simple cluster
+
+```bash
+kubectl create -f do/do-cluster.yaml
 ```

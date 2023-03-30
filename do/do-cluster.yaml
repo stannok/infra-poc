@@ -1,0 +1,31 @@
+apiVersion: kubernetes.do.crossplane.io/v1alpha1
+kind: DOKubernetesCluster
+metadata:
+  name: infra-poc
+spec:
+  deletionPolicy: 'Delete'
+  forProvider:
+    region: lon1
+    version: 1.26.3-do.0
+    tags:
+      - infra-poc
+    nodePools:
+      - size: s-1vcpu-2gb
+        autoScale: false
+        count: 1
+        minNodes: 1
+        maxNodes: 3
+        name: worker-pool
+        tags:
+          - infra-poc-worker-pool
+    maintenancePolicy:
+      startTime: '00:00'
+      day: wednesday
+    autoUpgrade: true
+    surgeUpgrade: false
+    highlyAvailable: false
+  providerConfigRef:
+    name: digitalocean-pc
+  writeConnectionSecretToRef:
+    name: 'digitalocean-infra-poc-details'
+    namespace: 'crossplane-system'
