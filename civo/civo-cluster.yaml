@@ -1,0 +1,19 @@
+kind: CivoKubernetes
+apiVersion: cluster.civo.crossplane.io/v1alpha1
+metadata:
+  name: infra-poc
+spec:
+  name: infra-poc
+  pools:
+    - count: 1
+      size: g4s.kube.xsmall
+  applications:
+    - 'argo-cd'
+    - 'prometheus-operator'
+  version: '1.25.0-k3s1'
+  cni: 'cilium'
+  connectionDetails:
+    connectionSecretNamePrefix: 'civo-cluster-details'
+    connectionSecretNamespace: 'default'
+  providerConfigRef:
+    name: civo-pc

@@ -1,0 +1,136 @@
+apiVersion: compute.gcp.upbound.io/v1beta1
+kind: Network
+metadata:
+  name: infra-private-poc-network1
+spec:
+  forProvider:
+    autoCreateSubnetworks: false
+  providerConfigRef:
+    name: gcp-pc
+
+---
+apiVersion: compute.gcp.upbound.io/v1beta1
+kind: Subnetwork
+metadata:
+  name: subnet-europe-west2-192
+spec:
+  forProvider:
+    networkRef:
+      name: infra-private-poc-network1
+    ipCidrRange: 192.168.1.0/24
+    region: europe-west2
+  providerConfigRef:
+    name: gcp-pc
+
+---
+apiVersion: compute.gcp.upbound.io/v1beta1
+kind: Router
+metadata:
+  name: infra-private-poc-nat-router
+spec:
+  forProvider:
+    networkRef:
+      name: infra-private-poc-network1
+    region: europe-west2
+  providerConfigRef:
+    name: gcp-pc
+
+---
+apiVersion: compute.gcp.upbound.io/v1beta1
+kind: Address
+metadata:
+  name: nginx-ingress-ip
+spec:
+  forProvider:
+    addressType: EXTERNAL
+    networkTier: PREMIUM
+    region: europe-west2
+  providerConfigRef:
+    name: gcp-pc
+
+---
+apiVersion: compute.gcp.upbound.io/v1beta1
+kind: Firewall
+metadata:
+  name: nginx-ingress-rule
+spec:
+  forProvider:
+    allow:
+      - ports:
+          - '8443'
+        protocol: tcp
+    sourceRanges:
+      - 0.0.0.0/0
+    networkRef:
+      name: infra-private-poc-network1
+  providerConfigRef:
+    name: gcp-pc
+
+---
+apiVersion: compute.gcp.upbound.io/v1beta1
+kind: RouterNAT
+metadata:
+  name: infra-private-poc-nat-config
+spec:
+  forProvider:
+    routerRef:
+      name: infra-private-poc-nat-router
+    region: europe-west2
+    natIpAllocateOption: AUTO_ONLY
+    sourceSubnetworkIpRangesToNat: ALL_SUBNETWORKS_ALL_IP_RANGES
+  providerConfigRef:
+    name: gcp-pc
+
+---
+apiVersion: container.gcp.upbound.io/v1beta1
+kind: Cluster
+metadata:
+  name: infra-private-poc
+spec:
+  forProvider:
+    location: europe-west2
+    # initialClusterVersion: latest
+    privateClusterConfig:
+      - enablePrivateEndpoint: false
+        enablePrivateNodes: true
+        masterIpv4CidrBlock: 172.16.0.0/28
+        masterGlobalAccessConfig:
+          - enabled: true
+    ipAllocationPolicy: [] #important
+    network: infra-private-poc-network1
+    subnetwork: subnet-europe-west2-192
+    initialNodeCount: 1
+    removeDefaultNodePool: true
+    releaseChannel:
+      - channel: UNSPECIFIED
+    # masterAuthorizedNetworksConfig:
+    #   enabled: false
+  providerConfigRef:
+    name: gcp-pc
+
+---
+apiVersion: container.gcp.upbound.io/v1beta1
+kind: NodePool
+metadata:
+  name: infra-private-poc-nodepool
+spec:
+  forProvider:
+    nodeLocations:
+      - europe-west2-a
+      - europe-west2-b
+      - europe-west2-c
+    clusterRef:
+      name: infra-private-poc
+    initialNodeCount: 1
+    nodeConfig:
+      - preemptible: true
+        machineType: e2-micro
+        oauthScopes:
+          - https://www.googleapis.com/auth/cloud-platform
+    autoscaling:
+      - minNodeCount: 1
+        maxNodeCount: 2
+    management:
+      - autoUpgrade: false
+  providerConfigRef:
+    name: gcp-pc

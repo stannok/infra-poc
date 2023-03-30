@@ -1,0 +1,38 @@
+apiVersion: container.gcp.upbound.io/v1beta1
+kind: Cluster
+metadata:
+  name: infra-poc
+spec:
+  forProvider:
+    location: europe-west2
+    initialNodeCount: 1
+    removeDefaultNodePool: true
+    releaseChannel:
+      - channel: UNSPECIFIED
+  providerConfigRef:
+    name: gcp-pc
+
+---
+apiVersion: container.gcp.upbound.io/v1beta1
+kind: NodePool
+metadata:
+  name: infra-poc-nodepool
+spec:
+  forProvider:
+    nodeLocations:
+      - europe-west2-a
+      - europe-west2-b
+      - europe-west2-c
+    clusterRef:
+      name: infra-poc
+    initialNodeCount: 1
+    nodeConfig:
+      - preemptible: true
+        machineType: e2-micro
+    autoscaling:
+      - minNodeCount: 1
+        maxNodeCount: 2
+    management:
+      - autoUpgrade: false
+  providerConfigRef:
+    name: gcp-pc

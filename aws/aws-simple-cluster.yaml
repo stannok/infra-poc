@@ -1,0 +1,437 @@
+apiVersion: eks.aws.upbound.io/v1beta1
+kind: Cluster
+metadata:
+  name: aws-infra-poc
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    region: eu-west-2
+    version: '1.25'
+    roleArnRef:
+      name: aws-infra-poc-iam-eks
+    vpcConfig:
+      - endpointPrivateAccess: true
+        endpointPublicAccess: true
+        subnetIdRefs:
+          - name: aws-infra-poc-sn-1a
+          - name: aws-infra-poc-sn-1b
+          - name: aws-infra-poc-sn-1c
+  # publishConnectionDetailsTo:
+  #   name: aws-infra-poc-kubeconfig
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: eks.aws.upbound.io/v1beta1
+kind: ClusterAuth
+metadata:
+  name: aws-infra-poc-ca
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    region: eu-west-2
+    clusterNameRef:
+      name: aws-infra-poc
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: iam.aws.upbound.io/v1beta1
+kind: Role
+metadata:
+  name: aws-infra-poc-iam-eks
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    assumeRolePolicy: |
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {
+                    "Service": [
+                        "eks.amazonaws.com"
+                    ]
+                },
+                "Action": [
+                    "sts:AssumeRole"
+                ]
+            }
+        ]
+      }
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: iam.aws.upbound.io/v1beta1
+kind: RolePolicyAttachment
+metadata:
+  name: aws-infra-poc-iama-cp
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    policyArn: arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+    roleRef:
+      name: aws-infra-poc-iam-eks
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: iam.aws.upbound.io/v1beta1
+kind: RolePolicyAttachment
+metadata:
+  name: aws-infra-poc-iama-svc
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    policyArn: arn:aws:iam::aws:policy/AmazonEKSServicePolicy
+    roleRef:
+      name: aws-infra-poc-iam-eks
+  providerConfigRef:
+    name: aws-pc
+
+## End clusert config
+---
+## Node config
+
+apiVersion: eks.aws.upbound.io/v1beta1
+kind: NodeGroup
+metadata:
+  name: aws-infra-poc-ng
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    region: eu-west-2
+    clusterNameRef:
+      name: aws-infra-poc
+    nodeRoleArnRef:
+      name: aws-infra-poc-iam-ng
+    subnetIdRefs:
+      - name: aws-infra-poc-sn-1a
+      - name: aws-infra-poc-sn-1b
+      - name: aws-infra-poc-sn-1c
+    scalingConfig:
+      - minSize: 1
+        maxSize: 10
+        desiredSize: 1
+    instanceTypes:
+      - t3.small
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: iam.aws.upbound.io/v1beta1
+kind: Role
+metadata:
+  name: aws-infra-poc-iam-ng
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    assumeRolePolicy: |
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {
+                    "Service": [
+                        "ec2.amazonaws.com"
+                    ]
+                },
+                "Action": [
+                    "sts:AssumeRole"
+                ]
+            }
+        ]
+      }
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: iam.aws.upbound.io/v1beta1
+kind: RolePolicyAttachment
+metadata:
+  name: aws-infra-poc-iama-worker
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    policyArn: arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+    roleRef:
+      name: aws-infra-poc-iam-ng
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: iam.aws.upbound.io/v1beta1
+kind: RolePolicyAttachment
+metadata:
+  name: aws-infra-poc-iama-cni
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    policyArn: arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+    roleRef:
+      name: aws-infra-poc-iam-ng
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: iam.aws.upbound.io/v1beta1
+kind: RolePolicyAttachment
+metadata:
+  name: aws-infra-poc-iama-registry
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    policyArn: arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+    roleRef:
+      name: aws-infra-poc-iam-ng
+  providerConfigRef:
+    name: aws-pc
+
+## End node config
+
+## Network config
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: VPC
+metadata:
+  name: aws-infra-poc-vpc
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    region: eu-west-2
+    cidrBlock: 10.0.0.0/16
+    enableDnsSupport: true
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: SecurityGroup
+metadata:
+  name: aws-infra-poc-secg
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    description: Cluster communication with worker nodes
+    region: eu-west-2
+    vpcIdRef:
+      name: aws-infra-poc-vpc
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: SecurityGroupRule
+metadata:
+  name: aws-infra-poc-sgr
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    description: Egress for the aws-poc cluster
+    region: eu-west-2
+    type: egress
+    fromPort: 0
+    toPort: 0
+    protocol: '-1'
+    cidrBlocks:
+      - 0.0.0.0/0
+    securityGroupIdRef:
+      name: aws-infra-poc-secg
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: Subnet
+metadata:
+  name: aws-infra-poc-sn-1a
+  labels:
+    zone: eu-west-2a
+    access: public
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    region: eu-west-2
+    availabilityZone: eu-west-2a
+    cidrBlock: 10.0.0.0/24
+    vpcIdRef:
+      name: aws-infra-poc-vpc
+    mapPublicIpOnLaunch: true
+    tags:
+      'kubernetes.io/role/elb': '1'
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: Subnet
+metadata:
+  name: aws-infra-poc-sn-1b
+  labels:
+    zone: eu-west-2b
+    access: public
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    region: eu-west-2
+    availabilityZone: eu-west-2b
+    cidrBlock: 10.0.1.0/24
+    vpcIdRef:
+      name: aws-infra-poc-vpc
+    mapPublicIpOnLaunch: true
+    tags:
+      'kubernetes.io/role/elb': '1'
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: Subnet
+metadata:
+  name: aws-infra-poc-sn-1c
+  labels:
+    zone: eu-west-2c
+    access: public
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    region: eu-west-2
+    availabilityZone: eu-west-2c
+    cidrBlock: 10.0.2.0/24
+    vpcIdRef:
+      name: aws-infra-poc-vpc
+    mapPublicIpOnLaunch: true
+    tags:
+      'kubernetes.io/role/elb': '1'
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: InternetGateway
+metadata:
+  name: aws-infra-poc-internet-gateway
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    region: eu-west-2
+    vpcIdRef:
+      name: aws-infra-poc-vpc
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: RouteTable
+metadata:
+  name: aws-infra-poc-route-table
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    region: eu-west-2
+    vpcIdRef:
+      name: aws-infra-poc-vpc
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: Route
+metadata:
+  name: aws-infra-poc-route
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    region: eu-west-2
+    routeTableIdRef:
+      name: aws-infra-poc-route-table
+    destinationCidrBlock: 0.0.0.0/0
+    gatewayIdRef:
+      name: aws-infra-poc-internet-gateway
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: MainRouteTableAssociation
+metadata:
+  name: aws-infra-poc-main-rta
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    region: eu-west-2
+    routeTableIdRef:
+      name: aws-infra-poc-route-table
+    vpcIdRef:
+      name: aws-infra-poc-vpc
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: RouteTableAssociation
+metadata:
+  name: aws-infra-poc-rta-zone-a
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    region: eu-west-2
+    routeTableIdRef:
+      name: aws-infra-poc-route-table
+    subnetIdRef:
+      name: aws-infra-poc-sn-1a
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: RouteTableAssociation
+metadata:
+  name: aws-infra-poc-rta-zone-b
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    region: eu-west-2
+    routeTableIdRef:
+      name: aws-infra-poc-route-table
+    subnetIdRef:
+      name: aws-infra-poc-sn-1b
+  providerConfigRef:
+    name: aws-pc
+
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: RouteTableAssociation
+metadata:
+  name: aws-infra-poc-rta-zone-c
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    region: eu-west-2
+    routeTableIdRef:
+      name: aws-infra-poc-route-table
+    subnetIdRef:
+      name: aws-infra-poc-sn-1c
+  providerConfigRef:
+    name: aws-pc
+
+## End of network
+
+## Addons
+---
+apiVersion: eks.aws.upbound.io/v1beta1
+kind: Addon
+metadata:
+  name: aws-ebs-csi-driver
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    region: eu-west-2
+    clusterNameRef:
+      name: aws-infra-poc
+  providerConfigRef:
+    name: aws-pc
+## End of Addons
